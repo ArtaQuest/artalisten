@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "artalisten"
+version = "0.1.0"
+description = "Transcribe and translate extreme low-SNR cafe recordings locally — Demucs, DeepFilterNet, global speaker clustering, faster-whisper"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "numpy>=1.26",
+  "scipy>=1.11",
+  "soundfile>=0.12",
+  "torch>=2.2",
+  "torchaudio>=2.2",
+  "demucs>=4.0.1",
+  "deepfilternet>=0.5.6",
+  "faster-whisper>=1.1.0",
+  "speechbrain>=1.0.2",
+  "scikit-learn>=1.4",
+  "silero-vad>=5.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+# pyannote speaker-diarization-3.1 is gated. Install this only when a Hugging Face token is available.
+diarize = ["pyannote.audio>=3.1"]
+
+[project.scripts]
+artalisten = "artalisten.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
