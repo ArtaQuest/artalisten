@@ -18,3 +18,13 @@ def test_consensus_requires_two_variants():
     assert all(g["support"] >= 2 for g in strong)
     # The single-variant phrase must be weak / excluded from final
     assert not any("одинокий" in g["text"] for g in strong)
+
+
+def test_short_russian_phrase_consensus():
+    variants = {
+        "E": [{"start": 90.8, "end": 92.1, "text": "А я не отдыхаю."}],
+        "F": [{"start": 90.4, "end": 92.1, "text": "А я не отдыхаю."}],
+        "G": [{"start": 90.0, "end": 92.1, "text": "А я не отдыхаю."}],
+    }
+    strong = final_only(consensus_phrases(variants, min_variants=2), min_variants=2)
+    assert any("отдыхаю" in g["text"] for g in strong)

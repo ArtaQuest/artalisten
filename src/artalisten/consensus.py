@@ -23,13 +23,17 @@ def tokenize(text: str) -> list[str]:
     return [normalize_token(m.group(0)) for m in _WORD.finditer(text or "") if normalize_token(m.group(0))]
 
 
-def soft_overlap(a: str, b: str, *, min_shared: int = 2) -> bool:
+def soft_overlap(a: str, b: str, *, min_shared: int | None = None) -> bool:
     """True when two phrases share enough content tokens (order-free)."""
-    ta = {t for t in tokenize(a) if len(t) >= 3 and not is_junk(t)}
-    tb = {t for t in tokenize(b) if len(t) >= 3 and not is_junk(t)}
+    ta = {t for t in tokenize(a) if len(t) >= 2 and not is_junk(t)}
+    tb = {t for t in tokenize(b) if len(t) >= 2 and not is_junk(t)}
     if not ta or not tb:
         return False
-    return len(ta & tb) >= min_shared
+    # Short cafe turns often have only 2–3 content words; require one shared token then.
+    need = min_shared
+    if need is None:
+        need = 1 if min(len(ta), len(tb)) <= 3 else 2
+    return len(ta & tb) >= need
 
 
 def consensus_phrases(
