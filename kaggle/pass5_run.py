@@ -220,15 +220,23 @@ def _two_speaker_and_anna(audio: np.ndarray, anna_profile: dict | None) -> dict:
 
     model = load_silero_vad()
     ts = get_speech_timestamps(
-        torch.from_numpy(audio),
+        torch.from_numpy(np.ascontiguousarray(audio)).float(),
         model,
         sampling_rate=16000,
         threshold=0.3,
         min_speech_duration_ms=80,
         min_silence_duration_ms=200,
     )
-    windows = [(t["start"] / 16000, t["end"] / 16000) for t in ts]
-    windows = speech_windows([(float(a), float(b)) for a, b in windows]) if windows else []
+    # silero returns sample indices
+    timestamps = []
+    for t in ts:
+        start = float(t["start"])
+        end = float(t["end"])
+        if end > len(audio):  # already seconds
+            timestamps.append({"start": start, "end": end})
+        else:
+            timestamps.append({"start": start / 16000.0, "end": end / 16000.0})
+    windows = speech_windows(timestamps) if timestamps else []
     if len(windows) < 2:
         return {
             "windows": [],
