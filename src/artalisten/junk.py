@@ -32,6 +32,10 @@ JUNK_PATTERNS: tuple[str, ...] = (
     r"девушки\s+отдыхают",
     # Ukrainian viewer fluff
     r"дякую\s+за\s+перегляд",
+    r"спасибо\s+за\s+просмотр",
+    r"^просмотр!?$",
+    r"^создавал$",
+    r"^сделал$",
     r"thanks\s+for\s+watching",
     # Whisper language-probe fluff
     r"говорит\s+на\s+русском",
