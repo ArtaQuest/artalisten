@@ -4,6 +4,8 @@ ArtaListen transcribes and translates long recordings made in extreme noise at a
 
 The first target is a distant cafe microphone: two people talking in Russian, one man and one woman, with an English song in the background.
 
+Low-SNR recovery details for the Anna cafe passes (forced Russian, junk filter, consensus, Anna-first stems) are in [METHOD.md](METHOD.md) (pass5 / v5).
+
 ## Install
 
 Python 3.11 or newer, and `ffmpeg`.

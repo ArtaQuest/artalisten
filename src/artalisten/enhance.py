@@ -188,3 +188,84 @@ def _overlap_add(
             break
         pos += hop
     return out / np.maximum(weight, 1e-6)
+
+
+def anna_bandpass(
+    audio,
+    sample_rate: int,
+    low_hz: float = 140.0,
+    high_hz: float = 6500.0,
+):
+    """Keep the higher female speech band; attenuate rumble and hiss."""
+    from artalisten.audioio import highpass
+    import numpy as np
+    from scipy.signal import butter, sosfiltfilt
+
+    x = np.asarray(audio, dtype=np.float32)
+    if x.size == 0:
+        return x
+    # high-pass then low-pass via second-order sections
+    x = highpass(x, sample_rate, low_hz) if low_hz > 0 else x
+    if high_hz and high_hz < 0.45 * sample_rate:
+        sos = butter(4, high_hz / (0.5 * sample_rate), btype="low", output="sos")
+        x = sosfiltfilt(sos, x).astype(np.float32)
+    return np.ascontiguousarray(x, dtype=np.float32)
+
+
+def dynamic_normalize(audio, sample_rate: int, target_rms: float = 0.08, ceiling: float = 0.95):
+    """Gentle RMS lift for ultra-quiet speech (variant G).
+
+    Raises quiet stretches toward ``target_rms`` without hard compression that
+    would pump the cafe noise floor too aggressively.
+    """
+    import numpy as np
+
+    x = np.asarray(audio, dtype=np.float64)
+    if x.size == 0:
+        return x.astype(np.float32)
+    frame = max(1, int(0.05 * sample_rate))
+    hop = max(1, frame // 2)
+    out = np.copy(x)
+    for i0 in range(0, len(x), hop):
+        i1 = min(len(x), i0 + frame)
+        piece = x[i0:i1]
+        rms = float(np.sqrt(np.mean(piece * piece) + 1e-12))
+        if rms < 1e-6:
+            continue
+        gain = min(ceiling / (np.max(np.abs(piece)) + 1e-9), target_rms / rms)
+        gain = float(np.clip(gain, 1.0, 8.0))
+        out[i0:i1] *= gain
+    peak = float(np.max(np.abs(out))) if out.size else 0.0
+    if peak > ceiling:
+        out *= ceiling / peak
+    return np.ascontiguousarray(out, dtype=np.float32)
+
+
+def apply_speaker_mask(
+    audio,
+    sample_rate: int,
+    turns: list[dict],
+    keep_speakers: set[str] | set[int],
+    *,
+    keep_gain: float = 1.0,
+    other_gain: float = 0.15,
+):
+    """Lift Anna (or quiet) turns and attenuate everyone else / gaps."""
+    import numpy as np
+
+    x = np.asarray(audio, dtype=np.float32)
+    out = x * float(other_gain)
+    keep = {str(s) for s in keep_speakers} | {s for s in keep_speakers}
+    for turn in turns:
+        sp = turn.get("speaker")
+        cid = turn.get("cluster")
+        label = turn.get("speaker_id")
+        keys = {sp, cid, label, str(sp), str(cid), str(label)}
+        if keys & {str(k) for k in keep} or (cid in keep_speakers) or (sp in keep_speakers):
+            i0 = max(0, int(float(turn["start"]) * sample_rate))
+            i1 = min(len(out), int(float(turn["end"]) * sample_rate))
+            out[i0:i1] = x[i0:i1] * float(keep_gain)
+    peak = float(np.max(np.abs(out))) if out.size else 0.0
+    if peak > 0.99:
+        out *= np.float32(0.99 / peak)
+    return np.ascontiguousarray(out, dtype=np.float32)

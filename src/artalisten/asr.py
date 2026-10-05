@@ -199,3 +199,115 @@ def _atomic_json(path: Path, payload) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     tmp.replace(path)
+
+
+def transcribe_independent_windows(
+    model,
+    audio,
+    sample_rate: int,
+    turns: list[dict],
+    *,
+    task: str = "transcribe",
+    language: str = "ru",
+    window_seconds: float = 10.0,
+    hop_seconds: float = 8.0,
+    beam_size: int = 5,
+    vad_filter: bool = False,
+) -> list[dict]:
+    """Decode short windows with no cross-window text conditioning.
+
+    Each window is a fresh Whisper call (``condition_on_previous_text=False``)
+    so low-SNR repetition loops cannot carry across the file. Language is
+    always forced — never auto-detected.
+    """
+    import numpy as np
+    from artalisten.junk import is_junk
+
+    if sample_rate != 16000:
+        raise RuntimeError("faster-whisper expects 16 kHz audio")
+    if language is None or str(language).lower() in {"", "auto", "detect"}:
+        raise ValueError("language must be forced (e.g. 'ru'); auto-detect is disabled for cafe jobs")
+    duration = float(len(audio) / sample_rate)
+    if window_seconds <= 0:
+        raise ValueError("window_seconds must be positive")
+    hop = hop_seconds if hop_seconds > 0 else window_seconds
+    words: list[dict] = []
+    t = 0.0
+    index = 0
+    while t < duration:
+        start = t
+        end = min(duration, t + window_seconds)
+        piece = np.ascontiguousarray(audio[int(start * sample_rate) : int(end * sample_rate)], dtype=np.float32)
+        if piece.size < sample_rate * 0.2:
+            break
+        kwargs = dict(
+            language=language,
+            task=task,
+            word_timestamps=True,
+            beam_size=beam_size,
+            temperature=0.0,
+            vad_filter=vad_filter,
+            condition_on_previous_text=False,
+            without_timestamps=False,
+        )
+        try:
+            segments, _info = model.transcribe(piece, **kwargs)
+        except TypeError:
+            segments, _info = model.transcribe(
+                piece,
+                language=language,
+                task=task,
+                word_timestamps=True,
+                beam_size=beam_size,
+                temperature=0.0,
+                vad_filter=vad_filter,
+                condition_on_previous_text=False,
+            )
+        for segment in segments:
+            no_speech = getattr(segment, "no_speech_prob", None)
+            seg_text = (getattr(segment, "text", None) or "").strip()
+            if is_junk(seg_text):
+                continue
+            segment_words = list(segment.words or [])
+            if segment_words:
+                for word in segment_words:
+                    if word.start is None or word.end is None:
+                        continue
+                    token = word.word
+                    if is_junk(token):
+                        continue
+                    abs_start = float(word.start) + start
+                    abs_end = float(word.end) + start
+                    speaker, speaker_id = speaker_at(turns, 0.5 * (abs_start + abs_end))
+                    words.append(
+                        {
+                            "start": abs_start,
+                            "end": abs_end,
+                            "word": token,
+                            "probability": None if word.probability is None else float(word.probability),
+                            "speaker": speaker,
+                            "speaker_id": speaker_id,
+                            "no_speech_prob": None if no_speech is None else float(no_speech),
+                            "window_index": index,
+                        }
+                    )
+            elif seg_text:
+                abs_start = float(segment.start) + start
+                abs_end = float(segment.end) + start
+                speaker, speaker_id = speaker_at(turns, 0.5 * (abs_start + abs_end))
+                words.append(
+                    {
+                        "start": abs_start,
+                        "end": abs_end,
+                        "word": seg_text,
+                        "probability": None,
+                        "speaker": speaker,
+                        "speaker_id": speaker_id,
+                        "no_speech_prob": None if no_speech is None else float(no_speech),
+                        "window_index": index,
+                    }
+                )
+        index += 1
+        t += hop
+    words.sort(key=lambda item: (float(item["start"]), float(item["end"])))
+    return words

@@ -47,6 +47,15 @@ JUNK = (
     r"продолжение\s+следует",
     r"субтитр",
     r"dima\s*torzok",
+    r"симон",
+    r"подогнал",
+    r"играет\s+музыка",
+    r"звучит\s+музыка",
+    r"звучить\s+музика",
+    r"music\s+playing",
+    r"девушки\s+отдыхают",
+    r"дякую\s+за\s+перегляд",
+    r"thanks\s+for\s+watching",
     r"говорит\s+на\s+русском",
     r"на\s+русском\s+языке",
     r"what is it",
@@ -54,7 +63,18 @@ JUNK = (
     r"tomorrow i will go to sleep",
     r"this is a story for the people",
     r"(?:yes[, ]+)?it is possible",
+    r"i don'?t know what to (?:say|do)",
+    r"i'?m going to start with a simple one",
+    r"we'?re done",
+    r"i want to hug you",
+    r"i love you(?:\s+so\s+much)?",
+    r"i can'?t take it anymore",
+    r"what are you doing\?",
+    r"i'?m telling you",
+    r"now i will\b",
+    r"let'?s do it",
     r"\boleg\b",
+    r"stsq\d*",
 )
 
 
@@ -380,12 +400,16 @@ def _cyrillic_count(text: str) -> int:
 
 
 def _is_junk(text: str) -> bool:
-    folded = (text or "").casefold().strip()
-    if not folded:
-        return False
-    if folded in {"говор", "на", "русском", "языке", "языке."}:
-        return True
-    return any(re.search(pattern, folded) for pattern in JUNK)
+    try:
+        from artalisten.junk import is_junk as _lib_junk
+        return _lib_junk(text)
+    except Exception:
+        folded = (text or "").casefold().strip()
+        if not folded:
+            return False
+        if folded in {"говор", "на", "русском", "языке", "языке.", "дякую", "дякую."}:
+            return True
+        return any(re.search(pattern, folded) for pattern in JUNK)
 
 
 def _mean_prob(utt: dict) -> float:
@@ -693,6 +717,27 @@ def _recover_file(
         kept, rejected = _merge_utterances(
             [word for utt in kept for word in utt.get("words_ru") or []],
             ru_open,
+        )
+        real_words = sum(len((utt.get("text_ru") or "").split()) for utt in kept)
+    if real_words < 40:
+        print(f"RETRY independent 10s windows on quiet stem, kept words {real_words}", flush=True)
+        from artalisten.asr import transcribe_independent_windows
+        from artalisten.align import group_utterances
+
+        win_words = transcribe_independent_windows(
+            model,
+            boosted,
+            16000,
+            turns,
+            task="transcribe",
+            language="ru",
+            window_seconds=10.0,
+            hop_seconds=8.0,
+            vad_filter=False,
+        )
+        kept, rejected = _merge_utterances(
+            [word for utt in kept for word in utt.get("words_ru") or []],
+            win_words,
         )
     en_words = _decode(model, boosted, 16000, turns, "translate", vad=True)
     en_words = [word for word in en_words if not _is_junk(str(word.get("word") or ""))]
