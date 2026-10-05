@@ -14,6 +14,10 @@ import re
 JUNK_PATTERNS: tuple[str, ...] = (
     # Russian / Ukrainian subtitle & continuation credits
     r"продолжение\s+следует",
+    r"^продолжение\.?$",
+    r"^следует\.{0,3}$",
+    r"^продолжение$",
+    r"^следует$",
     r"субтитр",
     r"dima\s*torzok",
     r"симон",
@@ -67,6 +71,10 @@ _EXACT_JUNK = frozenset(
         "языке.",
         "дякую.",
         "дякую",
+        "продолжение",
+        "следует",
+        "следует...",
+        "продолжение следует",
     }
 )
 

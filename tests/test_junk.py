@@ -40,3 +40,9 @@ def test_filter_segments_and_good_words():
     assert kept[0]["text"].startswith("Проверим")
     assert any("DimaTorzok" in (r["text"]) for r in rejected)
     assert good_word_count(kept, 0.4) == 2
+
+
+def test_rejects_split_continuation_fragments():
+    assert is_junk("Продолжение")
+    assert is_junk("следует...")
+    assert is_junk("следует")
