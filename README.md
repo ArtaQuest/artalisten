@@ -20,6 +20,29 @@ pip install -e .
 
 ## Run
 
+### Pass5 recovery (Mac-local, recommended for Voice Memos)
+
+```bash
+python3.11 -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+
+# single file
+caffeinate -i artalisten recover ~/Downloads/'Voice 261005_104834.m4a' \
+  --profile profiles/anna.json \
+  --deliverables deliverables/memo-local/
+
+# batch Voice Memos from Downloads
+caffeinate -i artalisten memo --inbox ~/Downloads --glob 'Voice*.m4a' \
+  --profile profiles/anna.json \
+  --deliverables deliverables/memo-local/
+```
+
+See [METHOD.md](METHOD.md) for the pass5 / v5 method. Kaggle scripts under `kaggle/`
+remain an optional remote GPU fallback; they are not required.
+
+### Legacy single-path
+
+
 ```bash
 artalisten process ~/Downloads/anna+brother.m4a --translate en
 ```

@@ -1,4 +1,6 @@
-"""ArtaListen pass5 / v5 — forced-Russian, junk-filtered, multi-variant recovery.
+"""DEPRECATED for Mac happy path — use `artalisten recover` / `artalisten memo`.
+
+ArtaListen pass5 / v5 — forced-Russian, junk-filtered, multi-variant recovery.
 
 Modes (env ARTALISTEN_MODE):
   voice       — one Voice *.m4a (+ optional anna.json profile for cosine match)

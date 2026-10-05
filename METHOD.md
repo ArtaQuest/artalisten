@@ -1,5 +1,43 @@
 # Recovery method — pass5 / v5
 
+## Mac-local automation (primary)
+
+Pass5 runs entirely on this Mac. Kaggle is optional fallback only.
+
+```bash
+# one Voice Memo
+caffeinate -i artalisten recover ~/Downloads/'Voice 261005_104834.m4a' \
+  --profile profiles/anna.json \
+  --out runs/pass5-local/104834 \
+  --deliverables deliverables/memo-local/
+
+# chat / project inbox (memo-01.m4a, …) — default glob *.m4a
+caffeinate -i artalisten memo --inbox ./inbox --glob '*.m4a' \
+  --profile profiles/anna.json \
+  --deliverables deliverables/memos-inbox/
+
+# batch every Voice*.m4a in Downloads
+caffeinate -i artalisten memo --inbox ~/Downloads --glob 'Voice*.m4a' \
+  --profile profiles/anna.json \
+  --out runs/pass5-memo \
+  --deliverables deliverables/memo-local/
+
+# cafe pair (fit train only; freeze test)
+caffeinate -i artalisten memo --inbox ~/Downloads --glob 'NO_MATCH' \
+  --cafe-train ~/Downloads/'anna+brother.m4a' \
+  --cafe-test ~/Downloads/'anna+brother_test.m4a' \
+  --profile profiles/anna.json \
+  --deliverables deliverables/memo-local/
+```
+
+On Apple M2 / 16 GB: Demucs + embeddings use MPS when available; faster-whisper stays
+CPU int8. Prefer `--shifts 1` (default for recover/memo) and `--skip-sepformer` if
+memory pressure is high. Stems are always kept under the run directory and copied
+into deliverables.
+
+Package entrypoint: `artalisten.recover` (ported from `kaggle/pass5_run.py`).
+
+
 ArtaListen pass5 targets the failure modes seen on the 2026-10-05 Anna cafe Voice
 files and the earlier soft-voice cafe train/test pair.
 
@@ -42,7 +80,9 @@ files and the earlier soft-voice cafe train/test pair.
 | Independent windows | `src/artalisten/asr.py` → `transcribe_independent_windows` |
 | Anna band / dynnorm / mask | `src/artalisten/enhance.py` |
 | Cafe soft-voice kernel | `kaggle/run.py` |
-| Multi-variant voice kernel | `kaggle/pass5_run.py` |
+| Local pass5 orchestration | `src/artalisten/recover.py` |
+| CLI `recover` / `memo` | `src/artalisten/cli.py` |
+| Multi-variant voice kernel (optional) | `kaggle/pass5_run.py` |
 
 ## Local tests
 
